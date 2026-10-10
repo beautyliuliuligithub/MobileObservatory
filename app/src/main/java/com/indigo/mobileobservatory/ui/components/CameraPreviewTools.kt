@@ -56,7 +56,6 @@ fun CameraPreviewTools(
     focusAssistEnabled: Boolean,
     showCenterMarker: Boolean,
     onFitToView: () -> Unit,
-    onRedNightModeChange: (Boolean) -> Unit,
     onTogglePanel: () -> Unit,
     onToggleOverlay: () -> Unit,
     onToggleFocusAssist: () -> Unit,
@@ -113,19 +112,6 @@ fun CameraPreviewTools(
                 expanded = menuOpen,
                 onDismissRequest = { menuOpen = false }
             ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.red_night_mode)) },
-                    onClick = { onRedNightModeChange(!redNightMode) },
-                    leadingIcon = {
-                        Icon(
-                            if (redNightMode) Icons.Default.Nightlight else Icons.Default.NightlightRound,
-                            contentDescription = null
-                        )
-                    },
-                    trailingIcon = {
-                        Switch(checked = redNightMode, onCheckedChange = null)
-                    }
-                )
                 if (connected) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.toggle_overlay)) },
@@ -201,7 +187,7 @@ private fun PreviewChromeButton(
         shadowElevation = 2.dp,
         modifier = Modifier
             .size(44.dp)
-            .clickable(onClick = onClick)
+            .observatoryClickable(CircleShape, onClick = onClick)
             .semantics { contentDescription = description }
     ) {
         Box(contentAlignment = Alignment.Center) {
