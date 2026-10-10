@@ -1,0 +1,946 @@
+package com.indigo.mobileobservatory.ui.screens
+
+import android.Manifest
+import android.app.Activity
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.indigo.mobileobservatory.BuildConfig
+import com.indigo.mobileobservatory.R
+import com.indigo.mobileobservatory.mount.MountConnectionState
+import com.indigo.mobileobservatory.mount.MountDirection
+import com.indigo.mobileobservatory.mount.MountProtocolType
+import com.indigo.mobileobservatory.mount.MountSlewRate
+import com.indigo.mobileobservatory.mount.MountTrackingRate
+import com.indigo.mobileobservatory.mount.MountTransportType
+import com.indigo.mobileobservatory.mount.SkyWatcherMountMode
+import com.indigo.mobileobservatory.pointing.PhoneSiteProvider
+import com.indigo.mobileobservatory.permissions.AppSettingsNavigator
+import com.indigo.mobileobservatory.permissions.BluetoothPermissionPolicy
+import com.indigo.mobileobservatory.ui.MountConnectionAction
+import com.indigo.mobileobservatory.ui.MountConnectionUiState
+import com.indigo.mobileobservatory.ui.components.deviceStatusColor
+import com.indigo.mobileobservatory.ui.components.DeviceStatusCode
+import com.indigo.mobileobservatory.ui.theme.ObservatoryTheme
+import com.indigo.mobileobservatory.ui.viewmodel.CameraViewModel
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MountControlScreen(
+    viewModel: CameraViewModel,
+    onOpenStarMap: () -> Unit,
+    onOpenPolarAlignment: () -> Unit,
+    onOpenGuiding: () -> Unit,
+    onOpenPushTo: () -> Unit = {},
+    onOpenTargetLibrary: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val connectionState by viewModel.mountConnectionState.collectAsState()
+    val coordinates by viewModel.mountCoordinates.collectAsState()
+    val transport by viewModel.mountTransport.collectAsState()
+    val host by viewModel.mountHost.collectAsState()
+    val port by viewModel.mountPort.collectAsState()
+    val synScanHost by viewModel.synScanHost.collectAsState()
+    val synScanPort by viewModel.synScanPort.collectAsState()
+    val skyWatcherMode by viewModel.skyWatcherMountMode.collectAsState()
+    val usbDevices by viewModel.mountUsbDevices.collectAsState()
+    val usbDeviceId by viewModel.mountUsbDeviceId.collectAsState()
+    val baudRate by viewModel.mountBaudRate.collectAsState()
+    val bluetoothDevices by viewModel.mountBluetoothDevices.collectAsState()
+    val bluetoothAddress by viewModel.mountBluetoothAddress.collectAsState()
+    val protocol by viewModel.mountProtocol.collectAsState()
+    val detectedInfo by viewModel.mountDetectedInfo.collectAsState()
+    val mountSite by viewModel.mountSite.collectAsState()
+    val busy by viewModel.mountBusy.collectAsState()
+    val connectionMessage by viewModel.mountConnectionMessage.collectAsState()
+    val moveStatus by viewModel.mountMoveStatus.collectAsState()
+    val slewRate by viewModel.mountSlewRate.collectAsState()
+    val trackingRate by viewModel.mountTrackingRate.collectAsState()
+    val connected = connectionState is MountConnectionState.Connected
+    val connectionUi = MountConnectionUiState.from(
+        connection = connectionState,
+        transport = transport,
+        busy = busy
+    )
+    val context = LocalContext.current
+    val activity = context as? Activity
+    val scope = rememberCoroutineScope()
+    var siteSyncDialogVisible by remember { mutableStateOf(false) }
+    var siteSyncBusy by remember { mutableStateOf(false) }
+    var siteSyncError by remember { mutableStateOf<String?>(null) }
+
+    fun loadPhoneSiteAndSync() {
+        if (siteSyncBusy || busy) return
+        siteSyncBusy = true
+        siteSyncError = null
+        scope.launch {
+            try {
+                val site = PhoneSiteProvider.currentSite(context.applicationContext)
+                viewModel.syncPhoneSiteToMount(site.latitudeDeg, site.longitudeDeg)
+                siteSyncDialogVisible = false
+            } catch (error: Throwable) {
+                siteSyncError = error.message ?: context.getString(R.string.location_permission_required)
+            } finally {
+                siteSyncBusy = false
+            }
+        }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        val granted = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) {
+            loadPhoneSiteAndSync()
+        } else {
+            siteSyncError = context.getString(R.string.location_permission_required)
+        }
+    }
+
+    fun requestPhoneSiteSync() {
+        if (PhoneSiteProvider.hasPermission(context)) {
+            loadPhoneSiteAndSync()
+        } else {
+            siteSyncError = null
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+    val requiredBluetoothPermissions = BluetoothPermissionPolicy.requiredPermissions(
+        Build.VERSION.SDK_INT
+    )
+    var pendingBluetoothAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var bluetoothPermissionDenied by remember { mutableStateOf(false) }
+    var bluetoothPermissionDeniedForever by remember { mutableStateOf(false) }
+    var bluetoothPermissionAsked by remember { mutableStateOf(false) }
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        bluetoothPermissionAsked = true
+        val granted = requiredBluetoothPermissions.all { permission ->
+            result[permission] == true || ContextCompat.checkSelfPermission(
+                context,
+                permission
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+        val action = pendingBluetoothAction
+        pendingBluetoothAction = null
+        bluetoothPermissionDenied = !granted
+        bluetoothPermissionDeniedForever = !granted &&
+            activity != null &&
+            requiredBluetoothPermissions.any { permission ->
+                !ActivityCompat.shouldShowRequestPermissionRationale(activity, permission)
+            }
+        if (granted) action?.invoke()
+    }
+
+    fun runWithBluetoothPermissions(action: () -> Unit) {
+        val missing = requiredBluetoothPermissions.filter { permission ->
+            ContextCompat.checkSelfPermission(context, permission) !=
+                PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isEmpty()) {
+            bluetoothPermissionDenied = false
+            bluetoothPermissionDeniedForever = false
+            action()
+        } else {
+            pendingBluetoothAction = action
+            bluetoothPermissionLauncher.launch(missing.toTypedArray())
+        }
+    }
+
+    fun scanBluetooth() {
+        runWithBluetoothPermissions(viewModel::scanMountBluetoothDevices)
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.scanMountUsbDevices()
+    }
+
+    var setupExpanded by rememberSaveable { mutableStateOf(true) }
+    LaunchedEffect(connected) { setupExpanded = !connected }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.mount_control_title),
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Text(
+                        stringResource(R.string.mount_connection_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                MountStateChip(
+                    code = when (connectionState) {
+                        MountConnectionState.Disconnected -> DeviceStatusCode.OFF
+                        MountConnectionState.Connecting -> DeviceStatusCode.CONNECTING
+                        MountConnectionState.Connected -> if (busy) DeviceStatusCode.ACTIVE
+                        else DeviceStatusCode.READY
+                        is MountConnectionState.Error -> DeviceStatusCode.ERROR
+                    },
+                    label = when (val state = connectionState) {
+                        MountConnectionState.Disconnected -> stringResource(R.string.disconnected)
+                        MountConnectionState.Connecting -> stringResource(R.string.connecting)
+                        MountConnectionState.Connected -> stringResource(R.string.connected)
+                        is MountConnectionState.Error -> stringResource(R.string.error)
+                    }
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { setupExpanded = !setupExpanded },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.section_device),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (!setupExpanded) {
+                            val transportLabel = when (transport) {
+                                MountTransportType.TCP -> "$host:$port"
+                                MountTransportType.USB_SERIAL -> usbDevices
+                                    .firstOrNull { it.deviceId == usbDeviceId }?.label
+                                    ?: stringResource(R.string.usb_serial)
+                                MountTransportType.BLUETOOTH -> bluetoothAddress.ifBlank {
+                                    stringResource(R.string.bluetooth)
+                                }
+                                MountTransportType.SYNSCAN_WIFI -> "$synScanHost:$synScanPort"
+                            }
+                            Text(
+                                transportLabel,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = if (setupExpanded) Icons.Default.ExpandLess
+                        else Icons.Default.ExpandMore,
+                        contentDescription = if (setupExpanded) {
+                            stringResource(R.string.collapse)
+                        } else {
+                            stringResource(R.string.expand)
+                        },
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (setupExpanded) {
+                if (connectionUi.showSetupPanel) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = transport == MountTransportType.TCP,
+                        onClick = { viewModel.setMountTransport(MountTransportType.TCP) },
+                        label = { Text("TCP") },
+                        enabled = !connected && !busy
+                    )
+                    FilterChip(
+                        selected = transport == MountTransportType.USB_SERIAL,
+                        onClick = {
+                            viewModel.setMountTransport(MountTransportType.USB_SERIAL)
+                            viewModel.scanMountUsbDevices()
+                        },
+                        label = { Text("USB") },
+                        enabled = !connected && !busy
+                    )
+                    FilterChip(
+                        selected = transport == MountTransportType.BLUETOOTH,
+                        onClick = {
+                            viewModel.setMountTransport(MountTransportType.BLUETOOTH)
+                            scanBluetooth()
+                        },
+                        label = { Text(stringResource(R.string.bluetooth)) },
+                        enabled = !connected && !busy
+                    )
+                    FilterChip(
+                        selected = transport == MountTransportType.SYNSCAN_WIFI,
+                        onClick = {
+                            viewModel.setMountTransport(MountTransportType.SYNSCAN_WIFI)
+                            viewModel.setMountProtocol(MountProtocolType.SKYWATCHER)
+                        },
+                        label = { Text("SynScan Wi‑Fi") },
+                        enabled = !connected && !busy
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    MountProtocolType.entries.forEach { type ->
+                        FilterChip(
+                            selected = protocol == type,
+                            onClick = { viewModel.setMountProtocol(type) },
+                            label = {
+                                Text(
+                                    when (type) {
+                                        MountProtocolType.AUTO -> stringResource(R.string.protocol_auto)
+                                        MountProtocolType.LX200_ONSTEP -> "LX200 / OnStep"
+                                        MountProtocolType.IOPTRON -> "iOptron"
+                                        MountProtocolType.SKYWATCHER -> "Sky-Watcher"
+                                    }
+                                )
+                            },
+                            enabled = !connected && !busy
+                        )
+                    }
+                }
+
+                when (transport) {
+                    MountTransportType.TCP -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = host,
+                                onValueChange = viewModel::setMountHost,
+                                label = { Text(stringResource(R.string.host)) },
+                                singleLine = true,
+                                enabled = !connected,
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = port,
+                                onValueChange = viewModel::setMountPort,
+                                label = { Text(stringResource(R.string.port)) },
+                                singleLine = true,
+                                enabled = !connected,
+                                modifier = Modifier.width(100.dp)
+                            )
+                        }
+                    }
+                    MountTransportType.USB_SERIAL -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            FilledTonalButton(
+                                onClick = viewModel::scanMountUsbDevices,
+                                enabled = !connected && !busy
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null)
+                                Text(stringResource(R.string.scan))
+                            }
+                            OutlinedTextField(
+                                value = baudRate,
+                                onValueChange = viewModel::setMountBaudRate,
+                                label = { Text(stringResource(R.string.baud_rate)) },
+                                singleLine = true,
+                                enabled = !connected,
+                                modifier = Modifier.width(140.dp)
+                            )
+                        }
+                        if (usbDevices.isEmpty()) {
+                            Text(
+                                stringResource(R.string.no_usb_serial_devices),
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        } else {
+                            usbDevices.forEach { device ->
+                                FilterChip(
+                                    selected = usbDeviceId == device.deviceId,
+                                    onClick = { viewModel.setMountUsbDevice(device.deviceId) },
+                                    label = { Text(device.label) },
+                                    enabled = !connected && !busy
+                                )
+                            }
+                        }
+                    }
+                    MountTransportType.BLUETOOTH -> {
+                        FilledTonalButton(
+                            onClick = ::scanBluetooth,
+                            enabled = !connected && !busy
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null)
+                            Text(stringResource(R.string.paired_devices))
+                        }
+                        if (bluetoothPermissionDenied) {
+                            Text(
+                                stringResource(
+                                    if (bluetoothPermissionDeniedForever && bluetoothPermissionAsked) {
+                                        R.string.nearby_devices_permission_denied_forever
+                                    } else {
+                                        R.string.nearby_devices_permission_required
+                                    }
+                                ),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            if (bluetoothPermissionDeniedForever && bluetoothPermissionAsked) {
+                                OutlinedButton(
+                                    onClick = { AppSettingsNavigator.openApplicationDetails(context) }
+                                ) {
+                                    Text(stringResource(R.string.open_app_settings))
+                                }
+                            }
+                        }
+                        if (bluetoothDevices.isEmpty()) {
+                            Text(
+                                stringResource(R.string.pair_mount_in_settings),
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        } else {
+                            bluetoothDevices.forEach { device ->
+                                FilterChip(
+                                    selected = bluetoothAddress == device.address,
+                                    onClick = {
+                                        viewModel.setMountBluetoothDevice(device.address)
+                                    },
+                                    label = { Text(device.label) },
+                                    enabled = !connected && !busy
+                                )
+                            }
+                        }
+                    }
+                    MountTransportType.SYNSCAN_WIFI -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = synScanHost,
+                                onValueChange = viewModel::setSynScanHost,
+                                label = { Text(stringResource(R.string.synscan_app_address)) },
+                                singleLine = true,
+                                enabled = !connected,
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedTextField(
+                                value = synScanPort,
+                                onValueChange = viewModel::setSynScanPort,
+                                label = { Text(stringResource(R.string.udp_port)) },
+                                singleLine = true,
+                                enabled = !connected,
+                                modifier = Modifier.width(110.dp)
+                            )
+                        }
+                        Text(
+                            stringResource(R.string.synscan_connection_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = skyWatcherMode == SkyWatcherMountMode.EQUATORIAL,
+                                onClick = {
+                                    viewModel.setSkyWatcherMountMode(SkyWatcherMountMode.EQUATORIAL)
+                                },
+                                label = { Text(stringResource(R.string.synscan_mode_equatorial)) },
+                                enabled = !connected && !busy
+                            )
+                            FilterChip(
+                                selected = skyWatcherMode == SkyWatcherMountMode.ALTAZ,
+                                onClick = {
+                                    viewModel.setSkyWatcherMountMode(SkyWatcherMountMode.ALTAZ)
+                                },
+                                label = { Text(stringResource(R.string.synscan_mode_altaz)) },
+                                enabled = !connected && !busy
+                            )
+                        }
+                    }
+                }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = {
+                            when (connectionUi.action) {
+                                MountConnectionAction.CANCEL -> viewModel.cancelMountConnection()
+                                MountConnectionAction.DISCONNECT -> viewModel.disconnectMount()
+                                MountConnectionAction.CONNECT -> {
+                                    if (transport == MountTransportType.BLUETOOTH) {
+                                        runWithBluetoothPermissions(viewModel::connectMount)
+                                    } else {
+                                        viewModel.connectMount()
+                                    }
+                                }
+                            }
+                        },
+                        enabled = connectionUi.actionEnabled,
+                        modifier = Modifier.height(48.dp)
+                    ) {
+                        if (connectionUi.showProgress) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(Modifier.width(6.dp))
+                        }
+                        Text(
+                            if (connectionState is MountConnectionState.Connecting &&
+                                transport == MountTransportType.BLUETOOTH) {
+                                stringResource(R.string.cancel_connection)
+                            } else {
+                                stringResource(
+                                    if (connected) R.string.disconnect else R.string.connect
+                                )
+                            }
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = viewModel::readMountCoordinates,
+                        enabled = connected && !busy,
+                        modifier = Modifier.height(48.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Text(stringResource(R.string.refresh_coordinates))
+                    }
+                }
+
+                Text(
+                    when (val state = connectionState) {
+                        MountConnectionState.Disconnected ->
+                            stringResource(R.string.disconnected)
+                        MountConnectionState.Connecting ->
+                            connectionMessage.ifBlank { stringResource(R.string.connecting) }
+                        is MountConnectionState.Connected ->
+                            stringResource(R.string.connected)
+                        is MountConnectionState.Error -> state.message
+                    },
+                    color = if (connectionState is MountConnectionState.Error) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+                coordinates?.let {
+                    Text(
+                        "${it.formatRa()}  ${it.formatDec()}",
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                if (detectedInfo.isNotBlank()) {
+                    Text(
+                        detectedInfo,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                if (connected) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.site),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                            mountSite?.let {
+                                Text(
+                                    it.format(),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                siteSyncError = null
+                                siteSyncDialogVisible = true
+                            },
+                            enabled = !busy && !siteSyncBusy
+                        ) {
+                            Text(stringResource(R.string.sync_site))
+                        }
+                    }
+                }
+                }
+            }
+        }
+
+        if (connected) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        stringResource(R.string.manual_mount_control),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        MountSlewRate.entries.forEach { rate ->
+                            FilterChip(
+                                selected = rate == slewRate,
+                                onClick = { viewModel.setMountSlewRate(rate) },
+                                label = { Text(rate.label) }
+                            )
+                        }
+                    }
+                    MountPressButton("N", stringResource(R.string.move_north), MountDirection.NORTH, viewModel)
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        MountPressButton("W", stringResource(R.string.move_west), MountDirection.WEST, viewModel)
+                        FilledTonalButton(onClick = viewModel::stopMountMotion) {
+                            Icon(Icons.Default.Stop, contentDescription = stringResource(R.string.stop_mount))
+                        }
+                        MountPressButton("E", stringResource(R.string.move_east), MountDirection.EAST, viewModel)
+                    }
+                    MountPressButton("S", stringResource(R.string.move_south), MountDirection.SOUTH, viewModel)
+                    if (moveStatus.isNotBlank()) {
+                        Text(moveStatus, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Text(
+                        stringResource(R.string.tracking_rate),
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        TrackingRateChip(
+                            selected = trackingRate == MountTrackingRate.OFF,
+                            label = stringResource(R.string.tracking_stopped),
+                            onClick = { viewModel.setMountTrackingRate(MountTrackingRate.OFF) }
+                        )
+                        TrackingRateChip(
+                            selected = trackingRate == MountTrackingRate.SIDEREAL,
+                            label = stringResource(R.string.tracking_sidereal),
+                            onClick = { viewModel.setMountTrackingRate(MountTrackingRate.SIDEREAL) }
+                        )
+                        TrackingRateChip(
+                            selected = trackingRate == MountTrackingRate.LUNAR,
+                            label = stringResource(R.string.tracking_lunar),
+                            onClick = { viewModel.setMountTrackingRate(MountTrackingRate.LUNAR) }
+                        )
+                        TrackingRateChip(
+                            selected = trackingRate == MountTrackingRate.SOLAR,
+                            label = stringResource(R.string.tracking_solar),
+                            onClick = { viewModel.setMountTrackingRate(MountTrackingRate.SOLAR) }
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = viewModel::goMountHome) {
+                            Icon(Icons.Default.Home, contentDescription = null)
+                            Text(stringResource(R.string.home))
+                        }
+                        OutlinedButton(onClick = viewModel::setMountHomeHere) {
+                            Text(stringResource(R.string.set_home))
+                        }
+                    }
+                }
+            }
+        }
+
+        if (siteSyncDialogVisible) {
+            AlertDialog(
+                onDismissRequest = {
+                    if (!siteSyncBusy) siteSyncDialogVisible = false
+                },
+                title = { Text(stringResource(R.string.sync_site_title)) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            stringResource(R.string.sync_site_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        FilledTonalButton(
+                            onClick = { viewModel.readMountSite(); siteSyncDialogVisible = false },
+                            enabled = connected && !busy && !siteSyncBusy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.mount_to_app))
+                        }
+                        FilledTonalButton(
+                            onClick = ::requestPhoneSiteSync,
+                            enabled = connected && !busy && !siteSyncBusy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (siteSyncBusy) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(Modifier.width(6.dp))
+                            }
+                            Text(stringResource(R.string.phone_to_mount))
+                        }
+                        FilledTonalButton(
+                            onClick = { viewModel.readMountTime(); siteSyncDialogVisible = false },
+                            enabled = connected && viewModel.mountSupportsTimeSync &&
+                                !busy && !siteSyncBusy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.mount_time_to_app))
+                        }
+                        FilledTonalButton(
+                            onClick = {
+                                viewModel.syncPhoneTimeToMount()
+                                siteSyncDialogVisible = false
+                            },
+                            enabled = connected && viewModel.mountSupportsTimeSync &&
+                                !busy && !siteSyncBusy,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.phone_time_to_mount))
+                        }
+                        if (connected && !viewModel.mountSupportsTimeSync) {
+                            Text(
+                                stringResource(R.string.mount_time_sync_unsupported),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        siteSyncError?.let { message ->
+                            Text(
+                                message,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = { siteSyncDialogVisible = false },
+                        enabled = !siteSyncBusy
+                    ) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (BuildConfig.STELLARIUM_ENABLED) {
+                FilledTonalButton(onClick = onOpenStarMap) {
+                    Text(stringResource(R.string.star_map))
+                }
+            }
+            FilledTonalButton(onClick = onOpenPolarAlignment) {
+                Text(stringResource(R.string.polar_alignment))
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilledTonalButton(onClick = onOpenPushTo) {
+                Text(stringResource(R.string.push_to_title))
+            }
+            FilledTonalButton(onClick = onOpenTargetLibrary) {
+                Text(stringResource(R.string.target_library_title))
+            }
+        }
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.guiding_module), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.guiding_module_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
+                FilledTonalButton(onClick = onOpenGuiding) {
+                    Text(stringResource(R.string.guiding))
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TrackingRateChip(
+    selected: Boolean,
+    label: String,
+    onClick: () -> Unit
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, maxLines = 1) },
+        modifier = Modifier.height(40.dp)
+    )
+}
+
+/** Connection state pill for the mount page header. */
+@Composable
+private fun MountStateChip(code: DeviceStatusCode, label: String) {
+    val accent = deviceStatusColor(code)
+    Surface(
+        color = accent.copy(alpha = 0.18f),
+        shape = CircleShape,
+        modifier = Modifier.height(36.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(accent, CircleShape)
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = ObservatoryTheme.colors.readout,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun MountPressButton(
+    label: String,
+    contentDescription: String,
+    direction: MountDirection,
+    viewModel: CameraViewModel
+) {
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        tonalElevation = 1.dp,
+        modifier = Modifier
+            .size(56.dp)
+            .semantics { this.contentDescription = contentDescription }
+            .pointerInput(direction) {
+                detectTapGestures(
+                    onPress = {
+                        viewModel.startMountManualMove(direction)
+                        tryAwaitRelease()
+                        viewModel.stopMountManualMove(direction)
+                    }
+                )
+            }
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(label)
+        }
+    }
+}

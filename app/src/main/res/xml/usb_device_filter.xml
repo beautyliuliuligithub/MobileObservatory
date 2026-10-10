@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ToupTek cameras (VID 0x0547 = 1351) -->
+    <usb-device vendor-id="1351" />
+    <!-- ToupTek USB2 / Cypress FX2 (VID 0x04B4 = 1204), official udev also matches this -->
+    <usb-device vendor-id="1204" />
+    <!-- Some GPM/OEM 462 units report the USB3 Vision generic ID (VID 0x2BA2 = 11170) -->
+    <usb-device vendor-id="11170" />
+    <!-- ZWO ASI cameras (VID 0x03C3 = 963) -->
+    <usb-device vendor-id="963" />
+    <!-- QHYCCD cameras (VID 0x1618 = 5656) -->
+    <usb-device vendor-id="5656" />
+    <!-- Player One cameras (VID 0xA0A0 = 41120) -->
+    <usb-device vendor-id="41120" />
+    <!-- Nikon PTP / MTP cameras (VID 0x04B0 = 1200). Code also requires USB Still Image class. -->
+    <usb-device vendor-id="1200" />
+</resources>

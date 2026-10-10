@@ -1,0 +1,151 @@
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: #02040a;
+    color: #f3f4f6;
+    font-family: sans-serif;
+}
+
+#stel-canvas {
+    display: block;
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    touch-action: none;
+}
+
+#engine-status,
+#mount-position {
+    position: fixed;
+    left: 12px;
+    z-index: 2;
+    max-width: min(520px, calc(100% - 24px));
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(4, 8, 18, 0.78);
+    font-size: 13px;
+    line-height: 1.4;
+    pointer-events: none;
+}
+
+#engine-status {
+    top: 12px;
+}
+
+#mount-position {
+    bottom: 72px;
+    display: none;
+}
+
+#fov-current,
+#fov-target {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    z-index: 1;
+    display: none;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45) inset;
+    font-size: 12px;
+    line-height: 1.2;
+    text-align: center;
+    pointer-events: none;
+    box-sizing: border-box;
+    overflow: visible;
+}
+
+.fov-label {
+    position: absolute;
+    left: 50%;
+    top: -22px;
+    transform-origin: center;
+    white-space: nowrap;
+}
+
+#fov-current .fov-label {
+    top: auto;
+    bottom: -22px;
+}
+
+#fov-current {
+    border: 2px solid rgba(80, 220, 160, 0.95);
+    background: rgba(80, 220, 160, 0.04);
+    color: rgba(180, 255, 220, 0.95);
+}
+
+#fov-target {
+    border: 2px dashed rgba(255, 196, 72, 0.95);
+    background: rgba(255, 196, 72, 0.05);
+    color: rgba(255, 220, 140, 0.95);
+}
+
+#fov-current.fov-circle,
+#fov-target.fov-circle {
+    border-radius: 50%;
+}
+
+#fov-current.fov-rect,
+#fov-target.fov-rect {
+    border-radius: 2px;
+}
+
+#fov-current.fov-vector,
+#fov-target.fov-vector {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+}
+
+.fov-vector svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.fov-vector .fov-panel {
+    vector-effect: non-scaling-stroke;
+    stroke-width: 2px;
+}
+
+#fov-current.fov-vector .fov-panel {
+    fill: rgba(80, 220, 160, 0.04);
+    stroke: rgba(80, 220, 160, 0.95);
+}
+
+#fov-target.fov-vector .fov-panel {
+    fill: rgba(255, 196, 72, 0.05);
+    stroke: rgba(255, 196, 72, 0.95);
+    stroke-dasharray: 8 5;
+}
+
+.fov-panel-number,
+.fov-svg-label {
+    fill: currentColor;
+    font-family: sans-serif;
+    paint-order: stroke;
+    stroke: rgba(2, 4, 10, 0.9);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+
+.fov-panel-number {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.fov-svg-label {
+    font-size: 12px;
+}
+
+html.night-vision #stel-canvas,
+html.night-vision #fov-current,
+html.night-vision #fov-target {
+    filter: grayscale(1) sepia(1) hue-rotate(-50deg) saturate(5) brightness(0.62);
+}

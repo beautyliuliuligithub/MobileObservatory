@@ -1,0 +1,104 @@
+package com.indigo.mobileobservatory.accessories
+
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class SerialAccessoryIdentityTest {
+    @Test
+    fun focuserBannersMatchKnownFirmware() {
+        assertEquals(
+            1103,
+            SerialAccessoryIdentity.focuserVersion("EFucoser ESP8266 ULN2003 Focuser ver 1103")
+        )
+        assertEquals(
+            1005,
+            SerialAccessoryIdentity.focuserVersion("EFucoser ESP8266 Focuser ver 1005")
+        )
+        assertEquals(
+            1201,
+            SerialAccessoryIdentity.focuserVersion("EFucoser Arduino Nano ULN2003 Focuser ver 1201")
+        )
+    }
+
+    @Test
+    fun rotatorBannersMatchKnownFirmware() {
+        assertEquals(
+            2007,
+            SerialAccessoryIdentity.rotatorVersion("CAA ESP8266 Rotator ver 2007")
+        )
+        assertEquals(
+            1013,
+            SerialAccessoryIdentity.rotatorVersion("scopfocus Rotator ver 1013")
+        )
+    }
+
+    @Test
+    fun versionOnlyReplyIsNotEnoughToClassifyRole() {
+        // Both firmwares answer V# this way ù must not be treated as identity.
+        assertFalse(SerialAccessoryIdentity.isFocuserBanner("V 1103"))
+        assertFalse(SerialAccessoryIdentity.isRotatorBanner("V 2007"))
+        assertFalse(SerialAccessoryIdentity.isRotatorBanner("V 1103"))
+    }
+
+    @Test
+    fun versionRepliesParseForBothFamilies() {
+        assertEquals(2007, SerialAccessoryIdentity.versionReply("V 2007"))
+        assertEquals(1013, SerialAccessoryIdentity.versionReply("V 1013"))
+        assertEquals(1103, SerialAccessoryIdentity.versionReply("V 1103"))
+        assertNull(SerialAccessoryIdentity.versionReply("ERR:empty"))
+        assertNull(SerialAccessoryIdentity.versionReply("F291"))
+    }
+
+    @Test
+    fun rotatorStatusReplyIsRecognised() {
+        assertTrue(SerialAccessoryIdentity.isRotatorStatus("P 20000;M false"))
+        assertTrue(SerialAccessoryIdentity.isRotatorStatus("P -120 ; M true"))
+        assertFalse(SerialAccessoryIdentity.isRotatorStatus("ERR:empty"))
+        assertFalse(SerialAccessoryIdentity.isRotatorStatus("V 2007"))
+    }
+
+    @Test
+    fun emptyCommandReplySeparatesFocuserFromRotator() {
+        // EFucoser answers the empty command with its banner, the CAA errors out.
+        assertTrue(
+            SerialAccessoryIdentity.isFocuserBanner("EFucoser ESP8266 ULN2003 Focuser ver 1103")
+        )
+        assertFalse(SerialAccessoryIdentity.isFocuserBanner("ERR:empty"))
+    }
+
+    @Test
+    fun focuserAndRotatorBannersDoNotCrossMatch() {
+        val focuser = "EFucoser ESP8266 ULN2003 Focuser ver 1103"
+        val rotator = "CAA ESP8266 Rotator ver 2007"
+        assertTrue(SerialAccessoryIdentity.isFocuserBanner(focuser))
+        assertFalse(SerialAccessoryIdentity.isRotatorBanner(focuser))
+        assertTrue(SerialAccessoryIdentity.isRotatorBanner(rotator))
+        assertFalse(SerialAccessoryIdentity.isFocuserBanner(rotator))
+    }
+
+    @Test
+    fun geminiEafFirmwareHandshakeMatches() {
+        assertEquals(291, SerialAccessoryIdentity.geminiEafVersion("F291"))
+        assertEquals(320, SerialAccessoryIdentity.geminiEafVersion("f320"))
+        assertTrue(SerialAccessoryIdentity.isGeminiEafFirmware("F291"))
+        assertFalse(SerialAccessoryIdentity.isGeminiEafFirmware("V 1103"))
+        assertFalse(SerialAccessoryIdentity.isGeminiEafFirmware(
+            "EFucoser ESP8266 ULN2003 Focuser ver 1103"
+        ))
+        assertFalse(SerialAccessoryIdentity.isFocuserBanner("F291"))
+    }
+
+    @Test
+    fun geminiFlatHandshakesMatchKnownRevisions() {
+        assertEquals("PRO", SerialAccessoryIdentity.geminiFlatRevisionFromHandshake("*HGeminiFlatPanelPro"))
+        assertEquals("LITE", SerialAccessoryIdentity.geminiFlatRevisionFromHandshake("*HGeminiFlatPanelLite"))
+        assertEquals("REV2", SerialAccessoryIdentity.geminiFlatRevisionFromHandshake("*HGeminiFlatPanel"))
+        assertTrue(SerialAccessoryIdentity.isGeminiFlatRev1Handshake("*P99OOO"))
+        assertTrue(SerialAccessoryIdentity.isGeminiFlatHandshake("*HGeminiFlatPanel"))
+        assertFalse(SerialAccessoryIdentity.isGeminiFlatHandshake("*HSomethingElse"))
+        assertFalse(SerialAccessoryIdentity.isGeminiFlatRev1Handshake("*P19OOO"))
+    }
+}

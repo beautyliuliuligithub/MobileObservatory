@@ -1,0 +1,81 @@
+# Hardware smoke tests
+
+Run these checks before a release that changes device, permission, or preview code.
+Record Android version, device model, accessory firmware, result, and relevant logs.
+Use the GitHub `Hardware validation result` issue form for external reports. A release
+record must also include the tested commit, APK certificate fingerprint, test duration,
+transport, measurements, and links to de-identified evidence.
+
+## Release evidence gate
+
+- Record every affected hardware family as passed, failed, or unavailable.
+- Treat unavailable required hardware as an explicit release risk.
+- Repeat failed rows after the fix on the exact release commit.
+- Verify upgrade installation from the previous public APK with the production key.
+- Link the final matrix from release notes and retain logs outside ephemeral CI storage.
+
+## Camera
+
+- Connect each supported camera family and start preview.
+- Change exposure, gain, pixel format, readout mode, ROI, flip, and rotation.
+- Confirm the gain control shows the vendor-native value (not dB as the primary number).
+  Enter an exact gain, drag the slider, and for Player One tap HDR/HCG/Unity/lowest-noise presets.
+  After pixel-format and readout-mode changes, confirm the gain range and current value refresh.
+- Capture JPG and FITS; record and reopen SER, PSER, MP4, and FITS sequences.
+  Confirm FITS `GAIN` is native (not labelled dB). If a dB conversion exists, `GAINDB` is present.
+  On at least one non-flagship phone, start MP4 recording: the app must not crash. If the encoder
+  cannot handle the ROI, it shows an error and SER/FITS still record.
+- Leave preview running for 30 minutes. Record `Preview baseline` Logcat values,
+  visible tearing, input latency, device temperature, and any reconnect failure.
+- Disconnect and reconnect after Activity recreation.
+- Nikon PTP M0 (D5100): device appears only in the main camera list, OpenSession succeeds,
+  logcat/`FileLogger` shows model + ISO list. Live View is not required for this row.
+
+## Mount
+
+Repeat for one OnStep/LX200, iOptron V3, and SkyWatcher/SynScan mount where available.
+
+- Connect through every supported transport for that mount.
+- Read coordinates and site, sync site, change slew rate, and tracking.
+- Start GOTO, manual movement, fixed-distance RA movement, and home movement.
+- Press global STOP from camera, mount, star map, guiding, and player pages.
+- Disconnect during motion and confirm the physical mount stops.
+
+## OnStep Bluetooth
+
+Test on Android 12, 13, 14, and 15 where available.
+
+- Grant nearby-device permissions and connect using standard RFCOMM.
+- Use an HC-05/HC-06 style module that requires insecure RFCOMM fallback.
+- Cancel during standard and compatible connection stages.
+- Turn Bluetooth off, remove pairing, deny permission, and connect to an
+  unresponsive device; verify distinct messages and no indefinite spinner.
+- Read coordinates after a successful connection.
+
+## Guiding and accessories
+
+- Connect the main camera and guide camera independently in both orders.
+- Detect and lock stars, calibrate, guide, stop, and clear calibration.
+- Connect focuser, filter wheel, cover/calibrator, and rotator independently.
+- Recreate the Activity and confirm every previously disconnected device can reconnect.
+
+## Accessibility and UI
+
+- Enable TalkBack and complete Bluetooth connect/cancel, star-map back, GOTO,
+  and global STOP actions.
+- Repeat critical flows at 200% font scaling and in landscape on a small screen.
+
+## Deep-sky sequence
+
+Night check for the sequence tab. Code through the autofocus routine is in place; this section is the hardware acceptance and is still open.
+
+Run the bidirectional NINA file, retained-node, expression, subframe ROI, and
+portrait nesting matrix in `docs/testing/NINA_SEQUENCE_ACCEPTANCE.md` for any
+release that changes sequence import, editing, execution, or export.
+
+- One target, two filters, at least two frames each. The run finishes without anyone touching the camera page.
+- Pause during an exposure, then resume. The FITS files that were written open cleanly.
+- With guiding already calibrated, the sequence starts guiding and dithers on the chosen interval. Guiding locks again after the dither.
+- The status page shows the history strip, HFR points, mount attitude, and the target altitude curve.
+- Set the meridian threshold so the flip is due immediately. The sequence stops guiding, recenters, and takes the next frame.
+- Unplug the filter wheel and run a filter change whose failure behavior pauses. The status page stays paused with a clear device message.
