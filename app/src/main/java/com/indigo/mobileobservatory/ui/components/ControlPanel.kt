@@ -1,6 +1,7 @@
 package com.indigo.mobileobservatory.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,6 +23,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.gestures.detectTapGestures
 import com.indigo.mobileobservatory.camera.*
 import com.indigo.mobileobservatory.camera.toupcam.EAFInfo
@@ -162,7 +164,8 @@ fun ControlPanel(
     onMountTracking: (Boolean) -> Unit = {},
     onMountHome: () -> Unit = {},
     onMountSetHome: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    panelWidth: Dp = 300.dp
 ) {
     val exposureMin by exposureMinFlow.collectAsState()
     val exposureMax by exposureMaxFlow.collectAsState()
@@ -193,7 +196,7 @@ fun ControlPanel(
 
     Column(
         modifier = modifier
-            .width(300.dp)
+            .width(panelWidth)
             .fillMaxHeight()
             .verticalScroll(rememberScrollState())
             .padding(8.dp),
@@ -1741,6 +1744,7 @@ private fun PanelQuickStrip(
     Surface(
         color = ObservatoryTheme.colors.card,
         shape = RoundedCornerShape(dimens.radiusMedium),
+        border = BorderStroke(1.dp, ObservatoryTheme.colors.cardBorder),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -1791,7 +1795,15 @@ private fun QuickCell(
     Column(
         modifier = modifier
             .heightIn(min = 44.dp)
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
+            .then(
+                if (onClick != null) {
+                    Modifier.observatoryClickable(
+                        RoundedCornerShape(ObservatoryTheme.dimens.radiusSmall)
+                    ) { onClick() }
+                } else {
+                    Modifier
+                }
+            ),
         verticalArrangement = Arrangement.Center
     ) {
         Text(
@@ -1834,13 +1846,14 @@ private fun PanelSectionTabs(
     ) {
         sections.forEach { section ->
             val selected = section == active
+            val shape = RoundedCornerShape(50)
             Surface(
                 color = if (selected) MaterialTheme.colorScheme.primaryContainer
                 else MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(50),
+                shape = shape,
                 modifier = Modifier
                     .height(40.dp)
-                    .clickable { onSelect(section) }
+                    .observatoryClickable(shape) { onSelect(section) }
             ) {
                 Box(
                     modifier = Modifier.padding(horizontal = 14.dp),

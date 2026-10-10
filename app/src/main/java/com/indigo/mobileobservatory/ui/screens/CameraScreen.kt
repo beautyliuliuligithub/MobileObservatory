@@ -1,6 +1,12 @@
 package com.indigo.mobileobservatory.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,6 +46,7 @@ import com.indigo.mobileobservatory.sequence.SequenceEditorMode
 import com.indigo.mobileobservatory.sequence.SequenceFeature
 import com.indigo.mobileobservatory.sequence.plannedFrames
 import com.indigo.mobileobservatory.ui.AppOrientationMode
+import com.indigo.mobileobservatory.ui.LARGE_WINDOW_MIN_SIDE_DP
 import com.indigo.mobileobservatory.ui.RememberAppOrientation
 
 private enum class MainControlTab {
@@ -413,7 +420,9 @@ fun CameraScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         val railLayout = maxWidth >= 600.dp || (maxWidth >= 520.dp && maxWidth > maxHeight)
-        val railLabels = maxWidth >= 600.dp
+        val largeWindow = minOf(maxWidth, maxHeight) >= LARGE_WINDOW_MIN_SIDE_DP.dp
+        val railLabels = largeWindow
+        val panelWidth = if (maxWidth >= 900.dp) 360.dp else 300.dp
         val toolsWideLayout = maxWidth >= 700.dp
         val navCameraLabel = stringResource(R.string.tab_camera)
         val navMountLabel = stringResource(R.string.tab_mount)
@@ -837,7 +846,6 @@ fun CameraScreen(
                     focusAssistEnabled = focusAssistEnabled,
                     showCenterMarker = showCenterMarker,
                     onFitToView = { viewResetTrigger++ },
-                    onRedNightModeChange = onRedNightModeChange,
                     onTogglePanel = { showPanel = !showPanel },
                     onToggleOverlay = { showOverlayPanel = !showOverlayPanel },
                     onToggleFocusAssist = { viewModel.toggleFocusAssist() },
@@ -850,7 +858,15 @@ fun CameraScreen(
             }
 
             // Right control panel
-            if (showPanel && connectionState is ConnectionState.Connected) {
+            // Animated so toggling the panel eases the preview wider instead of
+            // snapping the layout.
+            AnimatedVisibility(
+                visible = showPanel && connectionState is ConnectionState.Connected,
+                enter = expandHorizontally(animationSpec = tween(durationMillis = 200)) +
+                    fadeIn(animationSpec = tween(durationMillis = 150)),
+                exit = shrinkHorizontally(animationSpec = tween(durationMillis = 180)) +
+                    fadeOut(animationSpec = tween(durationMillis = 120))
+            ) {
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     tonalElevation = 1.dp
@@ -980,7 +996,8 @@ fun CameraScreen(
                         onMountSlewRateChange = { viewModel.setMountSlewRate(it) },
                         onMountTracking = { viewModel.setMountTracking(it) },
                         onMountHome = { viewModel.goMountHome() },
-                        onMountSetHome = { viewModel.setMountHomeHere() }
+                        onMountSetHome = { viewModel.setMountHomeHere() },
+                        panelWidth = panelWidth
                     )
                 }
             }
