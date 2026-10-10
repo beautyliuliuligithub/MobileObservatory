@@ -7,6 +7,13 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
@@ -321,7 +328,13 @@ fun MountControlScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                if (setupExpanded) {
+                AnimatedVisibility(
+                    visible = setupExpanded,
+                    enter = expandVertically(animationSpec = tween(durationMillis = 200)) +
+                        fadeIn(animationSpec = tween(durationMillis = 140)),
+                    exit = shrinkVertically(animationSpec = tween(durationMillis = 180)) +
+                        fadeOut(animationSpec = tween(durationMillis = 100))
+                ) {
                 if (connectionUi.showSetupPanel) {
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -918,9 +931,19 @@ private fun MountPressButton(
     direction: MountDirection,
     viewModel: CameraViewModel
 ) {
+    var pressed by remember { mutableStateOf(false) }
+    val containerColor by animateColorAsState(
+        targetValue = if (pressed) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.secondaryContainer
+        },
+        animationSpec = tween(durationMillis = 120),
+        label = "mount-press"
+    )
     Surface(
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = containerColor,
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         tonalElevation = 1.dp,
         modifier = Modifier
@@ -929,8 +952,10 @@ private fun MountPressButton(
             .pointerInput(direction) {
                 detectTapGestures(
                     onPress = {
+                        pressed = true
                         viewModel.startMountManualMove(direction)
                         tryAwaitRelease()
+                        pressed = false
                         viewModel.stopMountManualMove(direction)
                     }
                 )

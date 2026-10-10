@@ -1,6 +1,7 @@
 package com.indigo.mobileobservatory.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.indigo.mobileobservatory.ui.theme.ObservatoryTheme
 
 /**
  * One selectable pill of a horizontally scrollable selector row. [statusColor]
@@ -52,13 +54,16 @@ fun ObservatoryPillRow(
     ) {
         items.forEach { item ->
             val selected = item.key == selectedKey
+            val shape = RoundedCornerShape(50)
             Surface(
                 color = if (selected) MaterialTheme.colorScheme.primaryContainer
                 else MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(50),
+                shape = shape,
+                border = if (selected) null
+                else BorderStroke(1.dp, ObservatoryTheme.colors.hairline),
                 modifier = Modifier
                     .height(40.dp)
-                    .clickable { onSelect(item.key) }
+                    .observatoryClickable(shape) { onSelect(item.key) }
                     .semantics {
                         contentDescription = item.contentDescription ?: item.label
                     }

@@ -1,7 +1,9 @@
 package com.indigo.mobileobservatory.ui.components
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,8 +20,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -80,10 +84,24 @@ private fun BottomBarItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val shape = RoundedCornerShape(14.dp)
+    val indicatorColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
+        else Color.Transparent,
+        animationSpec = tween(durationMillis = 180),
+        label = "nav-indicator"
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(durationMillis = 180),
+        label = "nav-icon-tint"
+    )
     Column(
         modifier = modifier
             .fillMaxHeight()
-            .clickable { onClick() }
+            .padding(horizontal = 2.dp, vertical = 4.dp)
+            .observatoryClickable(shape, onClick = onClick)
             .semantics { contentDescription = entry.contentDescription },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -92,8 +110,7 @@ private fun BottomBarItem(
             modifier = Modifier
                 .size(width = 56.dp, height = 28.dp)
                 .background(
-                    color = if (selected) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surface,
+                    color = indicatorColor,
                     shape = RoundedCornerShape(50)
                 ),
             contentAlignment = Alignment.Center
@@ -101,8 +118,7 @@ private fun BottomBarItem(
             Icon(
                 imageVector = entry.icon,
                 contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = iconTint,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -163,31 +179,44 @@ private fun RailItem(
     showLabel: Boolean,
     onClick: () -> Unit,
 ) {
+    val shape = RoundedCornerShape(14.dp)
+    val indicatorColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer
+        else Color.Transparent,
+        animationSpec = tween(durationMillis = 180),
+        label = "rail-indicator"
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+        else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(durationMillis = 180),
+        label = "rail-icon-tint"
+    )
+    val indicatorWidth by animateDpAsState(
+        targetValue = if (showLabel) 60.dp else 44.dp,
+        animationSpec = tween(durationMillis = 180),
+        label = "rail-indicator-width"
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .height(if (showLabel) 64.dp else 52.dp)
             .padding(horizontal = 8.dp)
-            .clickable { onClick() }
+            .observatoryClickable(shape, onClick = onClick)
             .semantics { contentDescription = entry.contentDescription },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Box(
             modifier = Modifier
-                .size(width = if (showLabel) 60.dp else 44.dp, height = 30.dp)
-                .background(
-                    color = if (selected) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(50)
-                ),
+                .size(width = indicatorWidth, height = 30.dp)
+                .background(color = indicatorColor, shape = RoundedCornerShape(50)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = entry.icon,
                 contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = iconTint,
                 modifier = Modifier.size(22.dp)
             )
         }

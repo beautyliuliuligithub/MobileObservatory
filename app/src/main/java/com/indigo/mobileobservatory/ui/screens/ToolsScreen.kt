@@ -1,6 +1,7 @@
 package com.indigo.mobileobservatory.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +35,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.indigo.mobileobservatory.R
+import com.indigo.mobileobservatory.ui.components.StaggeredAppear
+import com.indigo.mobileobservatory.ui.components.observatoryClickable
 import com.indigo.mobileobservatory.ui.theme.ObservatoryTheme
 
 /**
@@ -126,10 +129,13 @@ fun ToolsScreen(
         }
 
         if (wideLayout) {
-            entries.chunked(2).forEach { row ->
+            entries.chunked(2).forEachIndexed { rowIndex, row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { entry ->
-                        ToolCard(entry = entry, modifier = Modifier.weight(1f))
+                    row.forEachIndexed { columnIndex, entry ->
+                        val index = rowIndex * 2 + columnIndex
+                        StaggeredAppear(index = index, modifier = Modifier.weight(1f)) {
+                            ToolCard(entry = entry)
+                        }
                     }
                     if (row.size == 1) {
                         Box(Modifier.weight(1f))
@@ -137,7 +143,9 @@ fun ToolsScreen(
                 }
             }
         } else {
-            entries.forEach { entry -> ToolCard(entry = entry) }
+            entries.forEachIndexed { index, entry ->
+                StaggeredAppear(index = index) { ToolCard(entry = entry) }
+            }
         }
     }
 }
@@ -157,13 +165,15 @@ private fun ToolCard(
     modifier: Modifier = Modifier,
 ) {
     val cardColor = ObservatoryTheme.colors.card
+    val shape = RoundedCornerShape(ObservatoryTheme.dimens.radiusLarge)
     Surface(
         color = cardColor,
-        shape = RoundedCornerShape(ObservatoryTheme.dimens.radiusLarge),
+        shape = shape,
+        border = BorderStroke(1.dp, ObservatoryTheme.colors.cardBorder),
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 84.dp)
-            .clickable { entry.onClick() }
+            .observatoryClickable(shape) { entry.onClick() }
             .semantics { contentDescription = entry.title }
     ) {
         Row(

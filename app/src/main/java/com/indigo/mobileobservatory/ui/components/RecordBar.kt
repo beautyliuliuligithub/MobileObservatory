@@ -264,9 +264,8 @@ fun RecordBar(
             Box(
                 modifier = Modifier
                     .size(60.dp)
-                    .clip(CircleShape)
                     .border(2.dp, MaterialTheme.colorScheme.onSurfaceVariant, CircleShape)
-                    .clickable { onCapture() },
+                    .observatoryClickable(CircleShape) { onCapture() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -280,13 +279,14 @@ fun RecordBar(
             Box(
                 modifier = Modifier
                     .size(60.dp)
-                    .clip(CircleShape)
                     .border(
                         2.dp,
                         if (isRecording) Color(0xFFFF4444) else MaterialTheme.colorScheme.onSurfaceVariant,
                         CircleShape
                     )
-                    .clickable { if (isRecording) onStopRecord() else onStartRecord() },
+                    .observatoryClickable(CircleShape) {
+                        if (isRecording) onStopRecord() else onStartRecord()
+                    },
                 contentAlignment = Alignment.Center
             ) {
                 if (isRecording) {

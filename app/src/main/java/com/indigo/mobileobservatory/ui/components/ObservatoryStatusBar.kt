@@ -121,7 +121,7 @@ fun ObservatoryStatusBar(
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .size(44.dp)
-                        .clickable { onToggleRedNight(!redNightMode) }
+                        .observatoryClickable(CircleShape) { onToggleRedNight(!redNightMode) }
                         .padding(10.dp)
                 )
                 val settingsDescription = stringResource(R.string.cockpit_open_settings)
@@ -131,7 +131,7 @@ fun ObservatoryStatusBar(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .size(44.dp)
-                        .clickable { onOpenSettings() }
+                        .observatoryClickable(CircleShape) { onOpenSettings() }
                         .padding(10.dp)
                 )
             }
@@ -161,7 +161,7 @@ private fun StatusPill(
             .then(
                 if (onClick != null) {
                     Modifier
-                        .clickable { onClick() }
+                        .observatoryClickable(RoundedCornerShape(50)) { onClick() }
                         .semantics { contentDescription = "${status.label} status" }
                 } else {
                     Modifier
@@ -175,10 +175,25 @@ private fun StatusPill(
                 .padding(horizontal = 12.dp)
         ) {
             Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(accent, CircleShape)
-            )
+                contentAlignment = Alignment.Center
+            ) {
+                // Soft halo so "ready / active" reads at a glance in the dark
+                // without relying on the colour alone.
+                if (status.code == DeviceStatusCode.READY ||
+                    status.code == DeviceStatusCode.ACTIVE
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(15.dp)
+                            .background(accent.copy(alpha = colors.ringAlpha), CircleShape)
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(8.dp)
+                        .background(accent, CircleShape)
+                )
+            }
             Spacer(Modifier.width(6.dp))
             Text(
                 text = status.label,

@@ -40,6 +40,10 @@ data class ObservatoryColors(
     val card: Color,
     /** Hairline dividers and outlines. */
     val hairline: Color,
+    /** Slightly brighter outline for cards that need definition on dark panels. */
+    val cardBorder: Color,
+    /** Soft halo drawn around status dots (same hue as the status colour). */
+    val ringAlpha: Float,
     /** Solid scrim for on-image chips (preview overlays). */
     val scrim: Color,
     /** Text drawn on top of preview imagery. */
@@ -87,9 +91,11 @@ private val RedNightStatus = ObservatoryStatusColors(
 
 private val DeepSpaceColors = ObservatoryColors(
     status = DeepSpaceStatus,
-    panel = Color(0xFF11151C),
-    card = Color(0xFF1A2029),
-    hairline = Color(0xFF2A313C),
+    panel = Color(0xFF101520),
+    card = Color(0xFF171E2B),
+    hairline = Color(0xFF273040),
+    cardBorder = Color(0xFF2E3849),
+    ringAlpha = 0.28f,
     scrim = Color(0x99000000),
     onImage = Color(0xFFD9DEE7),
     readout = Color(0xFFB9C7FF),
@@ -100,6 +106,8 @@ private val RedNightColors = ObservatoryColors(
     panel = Color(0xFF120202),
     card = Color(0xFF1C0505),
     hairline = Color(0xFF3A0A08),
+    cardBorder = Color(0xFF4A0F0B),
+    ringAlpha = 0.22f,
     scrim = Color(0xAA1A0000),
     onImage = Color(0xFFDE6255),
     readout = Color(0xFFFF8A7D),
